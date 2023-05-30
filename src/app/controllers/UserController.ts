@@ -2,6 +2,7 @@ import {Users} from '@prisma/client'
 import {compareSync, hashSync} from 'bcrypt'
 import {NextFunction, Request, Response} from 'express'
 import {sign} from 'jsonwebtoken'
+import CustomError from '../errors/CustomErrors'
 import {UsersRepository} from '../repositories'
 import {UserSchema} from '../validations'
 
@@ -34,10 +35,7 @@ class UserController {
           user,
         })
       } else {
-        res.status(404).json({
-          success: false,
-          message: 'User not found',
-        })
+        throw new CustomError(404, 'User not found')
       }
     } catch (error) {
       console.error('Error retrieving user:', error)
@@ -50,13 +48,8 @@ class UserController {
       const {name, email, password} = UserSchema.parse(req.body)
 
       const existingUser = await UsersRepository.findByEmail(email)
-      if (existingUser) {
-        res.status(400).json({
-          success: false,
-          message: 'Email already in use',
-        })
-        return
-      }
+
+      if (existingUser) throw new CustomError(409, 'Email already in use')
 
       const hashedPassword = hashSync(password, 10)
 
@@ -81,11 +74,11 @@ class UserController {
 
       const user = await UsersRepository.findByEmail(email)
 
-      if (!user) return res.status(401).send()
+      if (!user) throw new CustomError(401, 'Invalid credentials')
 
       const isSamePassword = compareSync(password, user.password)
 
-      if (!isSamePassword) return res.status(401).send()
+      if (!isSamePassword) throw new CustomError(401, 'Invalid credentials')
 
       const token = sign({id: user.id}, process.env.JWT_SECRET as string, {
         expiresIn: '1h',
