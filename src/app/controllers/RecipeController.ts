@@ -1,3 +1,4 @@
+import {Recipes} from '@prisma/client'
 import {NextFunction, Response} from 'express'
 import CustomError from '../errors/CustomErrors'
 import {AuthenticatedRequest} from '../interfaces'
@@ -65,13 +66,23 @@ class RecipeController {
     try {
       const user = req.user as {id: string}
       const {id} = req.params
-      const {name, description, prepTime} = RecipeSchema.parse(req.body)
+      const {name, description, prepTime} = RecipeSchema.partial().parse(req.body)
 
-      const recipe = await RecipesRepository.update(id, user.id, {
-        name,
-        description,
-        prepTime,
-      })
+      const updatedFields: Partial<Recipes> = {}
+
+      if (name !== undefined) {
+        updatedFields.name = name
+      }
+
+      if (description !== undefined) {
+        updatedFields.description = description
+      }
+
+      if (prepTime !== undefined) {
+        updatedFields.prepTime = prepTime
+      }
+
+      const recipe = await RecipesRepository.update(id, user.id, updatedFields)
 
       if (recipe) {
         res.status(200).json({
