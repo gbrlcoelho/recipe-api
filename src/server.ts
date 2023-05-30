@@ -1,7 +1,6 @@
 import express from 'express'
 import {errorHandlerMiddleware} from './app/middlewares'
-import {userRoutes} from './app/routes'
-import {recipeRoutes} from './app/routes/recipes'
+import {recipeRoutes, userRoutes} from './app/routes'
 
 export const server = express()
 
