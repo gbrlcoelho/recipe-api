@@ -1,12 +1,14 @@
-import {NextFunction, Request, Response} from 'express'
+import {NextFunction, Response} from 'express'
+import CustomError from '../errors/CustomErrors'
 import {AuthenticatedRequest} from '../interfaces'
 import {RecipesRepository} from '../repositories'
 import {RecipeSchema} from '../validations'
 
 class RecipeController {
-  async index(req: Request, res: Response, next: NextFunction) {
+  async index(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const recipes = await RecipesRepository.findAll()
+      const user = req.user as {id: string}
+      const recipes = await RecipesRepository.findAll(user.id)
 
       res.status(200).json({
         success: true,
@@ -19,10 +21,11 @@ class RecipeController {
     }
   }
 
-  async show(req: Request, res: Response, next: NextFunction) {
+  async show(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
+      const user = req.user as {id: string}
       const {id} = req.params
-      const recipe = await RecipesRepository.findById(id)
+      const recipe = await RecipesRepository.findById(id, user.id)
 
       if (recipe) {
         res.status(200).json({
@@ -31,10 +34,7 @@ class RecipeController {
           recipe,
         })
       } else {
-        res.status(404).json({
-          success: false,
-          message: 'Recipe not found',
-        })
+        throw new CustomError(404, 'Recipe not found')
       }
     } catch (error) {
       console.error('Error retrieving recipe:', error)
@@ -61,12 +61,13 @@ class RecipeController {
     }
   }
 
-  async update(req: Request, res: Response, next: NextFunction) {
+  async update(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
+      const user = req.user as {id: string}
       const {id} = req.params
       const {name, description, prepTime} = RecipeSchema.parse(req.body)
 
-      const recipe = await RecipesRepository.update(id, {
+      const recipe = await RecipesRepository.update(id, user.id, {
         name,
         description,
         prepTime,
@@ -79,10 +80,7 @@ class RecipeController {
           recipe,
         })
       } else {
-        res.status(404).json({
-          success: false,
-          message: 'Recipe not found',
-        })
+        throw new CustomError(404, 'Recipe not found')
       }
     } catch (error) {
       console.error('Error updating recipe:', error)
@@ -90,11 +88,12 @@ class RecipeController {
     }
   }
 
-  async delete(req: Request, res: Response, next: NextFunction) {
+  async delete(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
+      const user = req.user as {id: string}
       const {id} = req.params
 
-      const recipe = await RecipesRepository.delete(id)
+      const recipe = await RecipesRepository.delete(id, user.id)
 
       if (recipe) {
         res.status(200).json({
@@ -103,30 +102,10 @@ class RecipeController {
           recipe,
         })
       } else {
-        res.status(404).json({
-          success: false,
-          message: 'Recipe not found',
-        })
+        throw new CustomError(404, 'Recipe not found')
       }
     } catch (error) {
       console.error('Error deleting recipe:', error)
-      next(error)
-    }
-  }
-
-  async findByUserId(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const user = req.user as {id: string}
-
-      const recipes = await RecipesRepository.findByUserId(user.id)
-
-      res.status(200).json({
-        success: true,
-        message: 'Recipes retrieved successfully',
-        recipes,
-      })
-    } catch (error) {
-      console.error('Error retrieving recipes:', error)
       next(error)
     }
   }
