@@ -1,13 +1,12 @@
 import {Users} from '@prisma/client'
 import {compareSync, hashSync} from 'bcrypt'
-import {Request, Response} from 'express'
+import {NextFunction, Request, Response} from 'express'
 import {sign} from 'jsonwebtoken'
-import {ZodError} from 'zod'
 import {UsersRepository} from '../repositories'
 import {UserSchema} from '../validations'
 
 class UserController {
-  async index(req: Request, res: Response) {
+  async index(req: Request, res: Response, next: NextFunction) {
     try {
       const users = await UsersRepository.findAll()
 
@@ -18,14 +17,11 @@ class UserController {
       })
     } catch (error) {
       console.error('Error retrieving users:', error)
-      res.status(500).json({
-        success: false,
-        message: 'An error occurred while retrieving users',
-      })
+      next(error)
     }
   }
 
-  async show(req: Request, res: Response) {
+  async show(req: Request, res: Response, next: NextFunction) {
     try {
       const {id} = req.params
 
@@ -45,14 +41,11 @@ class UserController {
       }
     } catch (error) {
       console.error('Error retrieving user:', error)
-      res.status(500).json({
-        success: false,
-        message: 'An error occurred while retrieving the user',
-      })
+      next(error)
     }
   }
 
-  async store(req: Request<{}, {}, Omit<Users, 'id'>>, res: Response): Promise<void> {
+  async store(req: Request<{}, {}, Omit<Users, 'id'>>, res: Response, next: NextFunction): Promise<void> {
     try {
       const {name, email, password} = UserSchema.parse(req.body)
 
@@ -77,21 +70,12 @@ class UserController {
         user: userWithoutPassword,
       })
     } catch (error) {
-      if (error instanceof ZodError) {
-        res.status(422).json({
-          message: error.errors,
-        })
-        return
-      }
       console.error('Error creating user:', error)
-      res.status(500).json({
-        success: false,
-        message: 'An error occurred while creating the user',
-      })
+      next(error)
     }
   }
 
-  async login(req: Request, res: Response) {
+  async login(req: Request, res: Response, next: NextFunction) {
     try {
       const {email, password} = req.body
 
@@ -101,12 +85,7 @@ class UserController {
 
       const isSamePassword = compareSync(password, user.password)
 
-      if (!isSamePassword) {
-        return res.status(401).send({
-          success: false,
-          message: 'Invalid password',
-        })
-      }
+      if (!isSamePassword) return res.status(401).send()
 
       const token = sign({id: user.id}, process.env.JWT_SECRET as string, {
         expiresIn: '1h',
@@ -118,10 +97,7 @@ class UserController {
       })
     } catch (error) {
       console.error('Error logging in user:', error)
-      res.status(500).json({
-        success: false,
-        message: 'An error occurred while logging in the user',
-      })
+      next(error)
     }
   }
 }

@@ -1,1 +1,2 @@
-export * from './userSchema'
+export * from './RecipeSchema'
+export * from './UserSchema'
