@@ -1,13 +1,13 @@
 import {Users} from '@prisma/client'
 import {compareSync, hashSync} from 'bcrypt'
-import {Request, Response} from 'express'
+import {NextFunction, Request, Response} from 'express'
 import {sign} from 'jsonwebtoken'
-import {ZodError} from 'zod'
+import CustomError from '../errors/CustomErrors'
 import {UsersRepository} from '../repositories'
 import {UserSchema} from '../validations'
 
 class UserController {
-  async index(req: Request, res: Response) {
+  async index(req: Request, res: Response, next: NextFunction) {
     try {
       const users = await UsersRepository.findAll()
 
@@ -18,14 +18,11 @@ class UserController {
       })
     } catch (error) {
       console.error('Error retrieving users:', error)
-      res.status(500).json({
-        success: false,
-        message: 'An error occurred while retrieving users',
-      })
+      next(error)
     }
   }
 
-  async show(req: Request, res: Response) {
+  async show(req: Request, res: Response, next: NextFunction) {
     try {
       const {id} = req.params
 
@@ -38,32 +35,21 @@ class UserController {
           user,
         })
       } else {
-        res.status(404).json({
-          success: false,
-          message: 'User not found',
-        })
+        throw new CustomError(404, 'User not found')
       }
     } catch (error) {
       console.error('Error retrieving user:', error)
-      res.status(500).json({
-        success: false,
-        message: 'An error occurred while retrieving the user',
-      })
+      next(error)
     }
   }
 
-  async store(req: Request<{}, {}, Omit<Users, 'id'>>, res: Response): Promise<void> {
+  async store(req: Request<{}, {}, Omit<Users, 'id'>>, res: Response, next: NextFunction): Promise<void> {
     try {
       const {name, email, password} = UserSchema.parse(req.body)
 
       const existingUser = await UsersRepository.findByEmail(email)
-      if (existingUser) {
-        res.status(400).json({
-          success: false,
-          message: 'Email already in use',
-        })
-        return
-      }
+
+      if (existingUser) throw new CustomError(409, 'Email already in use')
 
       const hashedPassword = hashSync(password, 10)
 
@@ -77,36 +63,22 @@ class UserController {
         user: userWithoutPassword,
       })
     } catch (error) {
-      if (error instanceof ZodError) {
-        res.status(422).json({
-          message: error.errors,
-        })
-        return
-      }
       console.error('Error creating user:', error)
-      res.status(500).json({
-        success: false,
-        message: 'An error occurred while creating the user',
-      })
+      next(error)
     }
   }
 
-  async login(req: Request, res: Response) {
+  async login(req: Request, res: Response, next: NextFunction) {
     try {
       const {email, password} = req.body
 
       const user = await UsersRepository.findByEmail(email)
 
-      if (!user) return res.status(401).send()
+      if (!user) throw new CustomError(401, 'Invalid credentials')
 
       const isSamePassword = compareSync(password, user.password)
 
-      if (!isSamePassword) {
-        return res.status(401).send({
-          success: false,
-          message: 'Invalid password',
-        })
-      }
+      if (!isSamePassword) throw new CustomError(401, 'Invalid credentials')
 
       const token = sign({id: user.id}, process.env.JWT_SECRET as string, {
         expiresIn: '1h',
@@ -118,10 +90,7 @@ class UserController {
       })
     } catch (error) {
       console.error('Error logging in user:', error)
-      res.status(500).json({
-        success: false,
-        message: 'An error occurred while logging in the user',
-      })
+      next(error)
     }
   }
 }
