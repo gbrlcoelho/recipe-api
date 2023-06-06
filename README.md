@@ -23,7 +23,7 @@ This is a RESTful API for managing recipes and users. It allows you to perform C
 1. Clone the repository:
 
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/gbrlcoelho/recipe-api
 
 2. Install the dependencies:
 
